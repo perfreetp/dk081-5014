@@ -357,4 +357,23 @@ function setupIpcHandlers() {
     const padded = nextSeq.toString().padStart(4, '0')
     return `BC-${year}-${padded}`
   })
+
+  ipcMain.handle('get-item-rework-count', (_e, itemId) => {
+    const row = getOne(`
+      SELECT MAX(rework_count) as max_rework 
+      FROM work_orders 
+      WHERE item_id = ?
+    `, [itemId])
+    return row?.max_rework || 0
+  })
+
+  ipcMain.handle('get-items-by-statuses', (_e, statuses) => {
+    if (!statuses || statuses.length === 0) return []
+    const placeholders = statuses.map(() => '?').join(', ')
+    const rows = getQuery(
+      `SELECT * FROM items WHERE status IN (${placeholders}) ORDER BY updated_at ASC`,
+      statuses
+    )
+    return mapArrayToCamel(rows)
+  })
 }

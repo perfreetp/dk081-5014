@@ -33,6 +33,8 @@ contextBridge.exposeInMainWorld('api', {
   getCategoryWorkflow: (category: string) => ipcRenderer.invoke('get-category-workflow', category),
   getCategoryParts: (category: string) => ipcRenderer.invoke('get-category-parts', category),
   getNextItemCode: () => ipcRenderer.invoke('get-next-item-code'),
+  getItemReworkCount: (itemId: string) => ipcRenderer.invoke('get-item-rework-count', itemId),
+  getItemsByStatuses: (statuses: string[]) => ipcRenderer.invoke('get-items-by-statuses', statuses),
 })
 
 export type API = typeof window.api

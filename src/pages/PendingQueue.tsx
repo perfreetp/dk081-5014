@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Table, Tag, Button, Space, Select, Input, Modal, Form, message, Row, Col, Card } from 'antd'
+import { Table, Tag, Button, Space, Select, Input, Modal, Form, message, Row, Col, Card, InputNumber } from 'antd'
 import { PlusOutlined, UserOutlined } from '@ant-design/icons'
 import { Item, STATUS_LABELS, STATUS_COLORS, CATEGORY_LABELS, Worker } from '../types'
 import dayjs from 'dayjs'
@@ -18,9 +18,11 @@ export default function PendingQueue() {
   const [searchText, setSearchText] = useState('')
   const [assignModalVisible, setAssignModalVisible] = useState(false)
   const [createModalVisible, setCreateModalVisible] = useState(false)
+  const [batchModalVisible, setBatchModalVisible] = useState(false)
   const [selectedItem, setSelectedItem] = useState<Item | null>(null)
   const [form] = Form.useForm()
   const [assignForm] = Form.useForm()
+  const [batchForm] = Form.useForm()
 
   useEffect(() => {
     loadData()
@@ -84,6 +86,41 @@ export default function PendingQueue() {
       loadData()
     } catch (error) {
       message.error('创建失败')
+      console.error(error)
+    }
+  }
+
+  const handleBatchCreate = async (values: any) => {
+    try {
+      const count = values.count || 1
+      const now = new Date().toISOString()
+      const createdCodes: string[] = []
+
+      for (let i = 0; i < count; i++) {
+        const code = await window.api.getNextItemCode()
+        await window.api.createItem({
+          id: crypto.randomUUID(),
+          code,
+          name: values.name ? `${values.name}${count > 1 ? ` (${i + 1}/${count})` : ''}` : `${CATEGORY_LABELS[values.category as keyof typeof CATEGORY_LABELS]}商品${count > 1 ? ` ${i + 1}` : ''}`,
+          category: values.category,
+          brand: values.brand,
+          model: values.model,
+          receivedDate: values.receivedDate,
+          source: values.source,
+          status: 'PENDING',
+          notes: values.notes,
+          createdAt: now,
+          updatedAt: now
+        })
+        createdCodes.push(code)
+      }
+
+      message.success(`批量创建成功：${createdCodes.length} 件商品（${createdCodes[0]} ~ ${createdCodes[createdCodes.length - 1]}）`)
+      setBatchModalVisible(false)
+      batchForm.resetFields()
+      loadData()
+    } catch (error) {
+      message.error('批量创建失败')
       console.error(error)
     }
   }
@@ -305,6 +342,9 @@ export default function PendingQueue() {
           <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateModalVisible(true)}>
             登记新商品
           </Button>
+          <Button icon={<PlusOutlined />} onClick={() => setBatchModalVisible(true)}>
+            批量录入
+          </Button>
           <Button onClick={loadData}>刷新</Button>
         </Space>
 
@@ -366,6 +406,70 @@ export default function PendingQueue() {
             <Space>
               <Button onClick={() => setCreateModalVisible(false)}>取消</Button>
               <Button type="primary" htmlType="submit">创建</Button>
+            </Space>
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title="📦 批量录入"
+        open={batchModalVisible}
+        onCancel={() => setBatchModalVisible(false)}
+        footer={null}
+        width={500}
+      >
+        <Form form={batchForm} layout="vertical" onFinish={handleBatchCreate}
+          initialValues={{ count: 1, receivedDate: dayjs().format('YYYY-MM-DD'), source: '线下门店回收' }}
+        >
+          <Form.Item name="count" label="录入数量" rules={[{ required: true, message: '请输入数量' }]}>
+            <InputNumber min={1} max={50} style={{ width: '100%' }} placeholder="输入要录入的商品数量" />
+          </Form.Item>
+          <Form.Item name="category" label="品类" rules={[{ required: true, message: '请选择品类' }]}>
+            <Select>
+              {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
+                <Option key={value} value={value}>{label}</Option>
+              ))}
+            </Select>
+          </Form.Item>
+          <Form.Item name="name" label="商品名称（选填，多件时自动编号）">
+            <Input placeholder="如：好孩子婴儿推车，留空则自动命名" />
+          </Form.Item>
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item name="brand" label="品牌">
+                <Input placeholder="如：好孩子" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="model" label="型号">
+                <Input placeholder="如：C400" />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item name="receivedDate" label="收货日期" rules={[{ required: true, message: '请选择日期' }]}>
+                <Input style={{ width: '100%' }} type="date" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="source" label="来源渠道">
+                <Input placeholder="如：线下门店回收" />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Form.Item name="notes" label="备注">
+            <Input.TextArea rows={2} placeholder="通用备注，将应用到全部商品" />
+          </Form.Item>
+          <div style={{ padding: 12, background: '#f0f9ff', borderRadius: 6, marginBottom: 16 }}>
+            <div style={{ fontSize: 13, color: '#0369a1' }}>
+              提示：编码将按全库最大编号自动递增分配连续编号
+            </div>
+          </div>
+          <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
+            <Space>
+              <Button onClick={() => setBatchModalVisible(false)}>取消</Button>
+              <Button type="primary" htmlType="submit">批量创建</Button>
             </Space>
           </Form.Item>
         </Form>

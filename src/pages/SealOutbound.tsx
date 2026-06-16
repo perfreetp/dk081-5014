@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Card, Button, Space, Row, Col, Typography, Select, Form, Tag, message, Descriptions, Table, Divider, QRCode } from 'antd'
+import { Card, Button, Space, Row, Col, Typography, Select, Form, Tag, message, Descriptions, Table, Divider, QRCode, Modal } from 'antd'
 import { ArrowLeftOutlined, PrinterOutlined, QrcodeOutlined, CheckCircleOutlined } from '@ant-design/icons'
 import ItemSelector from '../components/ItemSelector'
 import { Item, WorkOrder, Inspection, Photo, Seal, HistoryCard, Worker, CATEGORY_LABELS, STATUS_LABELS, STATUS_COLORS, INSPECTION_RESULT_LABELS, CONDITION_LABELS } from '../types'
@@ -108,12 +108,56 @@ export default function SealOutbound() {
     return `SEAL-${date}-${random}`
   }
 
+  const validateBeforeSeal = (): string[] => {
+    const warnings: string[] = []
+    if (!latestInspection) {
+      warnings.push('缺少复检结论，该商品尚未完成复检判级')
+    }
+    const afterPhotos = photos.filter(p => p.type === 'AFTER')
+    if (afterPhotos.length === 0) {
+      warnings.push('缺少处理后照片，建议补充清洁后留档照片')
+    }
+    if (latestWorkOrder && (latestWorkOrder.partsMissing?.length || 0) > 0 && !latestWorkOrder.notes) {
+      warnings.push(`存在缺失部件（${latestWorkOrder.partsMissing?.join('、')}）但未填写说明备注`)
+    }
+    return warnings
+  }
+
   const handleSeal = async (values: any) => {
     if (!selectedItem || !selectedItemId) return
     if (currentSeal) {
       message.warning('该商品已封存，无需重复生成封签')
       return
     }
+
+    const warnings = validateBeforeSeal()
+    if (warnings.length > 0) {
+      Modal.confirm({
+        title: '⚠️ 封存前校验提醒',
+        width: 480,
+        content: (
+          <div>
+            <p style={{ marginBottom: 12 }}>以下问题需要确认后再封存：</p>
+            {warnings.map((w, i) => (
+              <div key={i} style={{ padding: '6px 0', color: '#d97706', fontSize: 13 }}>
+                {i + 1}. {w}
+              </div>
+            ))}
+            <p style={{ marginTop: 12, color: '#666', fontSize: 12 }}>确认以上问题已知晓，继续封存？</p>
+          </div>
+        ),
+        okText: '确认封存',
+        cancelText: '暂不封存',
+        onOk: async () => await doSeal(values)
+      })
+      return
+    }
+
+    await doSeal(values)
+  }
+
+  const doSeal = async (values: any) => {
+    if (!selectedItem || !selectedItemId) return
     try {
       const now = new Date().toISOString()
       const sealCode = generateSealCode()

@@ -152,6 +152,8 @@ export default function WorkOrderPage() {
         .filter(([_, present]) => !present)
         .map(([part]) => part)
 
+      const historyReworkCount = await window.api.getItemReworkCount(selectedItemId)
+
       const workOrder = {
         id: crypto.randomUUID(),
         itemId: selectedItemId,
@@ -160,7 +162,7 @@ export default function WorkOrderPage() {
         startTime: startTime,
         endTime: now,
         totalMinutes: Math.ceil(elapsedSeconds / 60),
-        reworkCount: 0,
+        reworkCount: historyReworkCount,
         partsChecklist,
         cleaningRestrictions: values.restrictions || [],
         wearLevel: values.wearLevel,
