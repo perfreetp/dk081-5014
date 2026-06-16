@@ -67,8 +67,10 @@ function setupIpcHandlers() {
     let sql = 'SELECT * FROM items WHERE 1=1'
     const params: any[] = []
     if (filters?.status) {
-      sql += ' AND status = ?'
-      params.push(filters.status)
+      const statuses = Array.isArray(filters.status) ? filters.status : [filters.status]
+      const placeholders = statuses.map(() => '?').join(', ')
+      sql += ` AND status IN (${placeholders})`
+      params.push(...statuses)
     }
     if (filters?.category) {
       sql += ' AND category = ?'
@@ -336,20 +338,23 @@ function setupIpcHandlers() {
   })
 
   ipcMain.handle('get-next-item-code', () => {
-    const row = getOne(`
+    const rows = getQuery(`
       SELECT code FROM items 
-      WHERE code LIKE 'BC-____-%' 
-      ORDER BY code DESC LIMIT 1
+      WHERE code LIKE 'BC-____-%'
     `)
     const year = new Date().getFullYear()
-    if (!row || !row.code) {
-      return `BC-${year}-0001`
-    }
-    const match = row.code.match(/BC-\d{4}-(\d{4})/)
-    let nextNum = 1
-    if (match) {
-      nextNum = parseInt(match[1], 10) + 1
-    }
-    return `BC-${year}-${String(nextNum).padStart(4, '0')}`
+    let maxSeq = 0
+    rows.forEach((row: any) => {
+      const match = row.code.match(/BC-\d{4}-(\d+)/)
+      if (match) {
+        const seq = parseInt(match[1], 10)
+        if (seq > maxSeq) {
+          maxSeq = seq
+        }
+      }
+    })
+    const nextSeq = maxSeq + 1
+    const padded = nextSeq.toString().padStart(4, '0')
+    return `BC-${year}-${padded}`
   })
 }

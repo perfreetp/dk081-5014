@@ -20,17 +20,12 @@ export default function ItemSelector({ value, onChange, statusFilter, placeholde
   const loadItems = async () => {
     setLoading(true)
     try {
-      let filters: any = {}
+      const filters: any = {}
       if (statusFilter && statusFilter.length > 0) {
-        filters = { status: statusFilter[0] }
+        filters.status = statusFilter
       }
       const data = await window.api.getItems(filters)
-      if (statusFilter && statusFilter.length > 1) {
-        const filtered = data.filter((item: Item) => statusFilter.includes(item.status))
-        setItems(filtered)
-      } else {
-        setItems(data)
-      }
+      setItems(data)
     } catch (error) {
       console.error('加载商品列表失败', error)
     } finally {

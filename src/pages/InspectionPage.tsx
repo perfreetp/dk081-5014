@@ -134,7 +134,7 @@ export default function InspectionPage() {
       }
 
       if (values.result === 'REWORK' && workOrders.length > 0) {
-        const lastOrder = workOrders[workOrders.length - 1]
+        const lastOrder = workOrders[0]
         await window.api.updateWorkOrder(lastOrder.id, {
           rework_count: (lastOrder.reworkCount || 0) + 1
         })
@@ -176,7 +176,7 @@ export default function InspectionPage() {
     </div>
   )
 
-  const latestWorkOrder = workOrders[workOrders.length - 1]
+  const latestWorkOrder = workOrders[0]
 
   return (
     <div>

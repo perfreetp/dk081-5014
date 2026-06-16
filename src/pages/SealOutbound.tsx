@@ -209,8 +209,8 @@ export default function SealOutbound() {
     }
   }
 
-  const latestInspection = inspections[inspections.length - 1]
-  const latestWorkOrder = workOrders[workOrders.length - 1]
+  const latestInspection = inspections[0]
+  const latestWorkOrder = workOrders[0]
 
   return (
     <div>
