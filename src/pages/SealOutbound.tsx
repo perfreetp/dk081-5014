@@ -275,7 +275,7 @@ export default function SealOutbound() {
             <ItemSelector
               value={selectedItemId}
               onChange={handleItemSelect}
-              statusFilter={['SEALED', 'INSPECTING']}
+              statusFilter={['PENDING_SEAL', 'SEALED']}
               placeholder="选择要封存的商品"
             />
           </div>

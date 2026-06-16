@@ -43,6 +43,7 @@ declare global {
       getNextItemCode: () => Promise<string>
       getItemReworkCount: (itemId: string) => Promise<number>
       getItemsByStatuses: (statuses: string[]) => Promise<any[]>
+      getItemsWithReworkCount: (statuses: string[]) => Promise<any[]>
     }
   }
 }

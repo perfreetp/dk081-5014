@@ -35,6 +35,7 @@ contextBridge.exposeInMainWorld('api', {
   getNextItemCode: () => ipcRenderer.invoke('get-next-item-code'),
   getItemReworkCount: (itemId: string) => ipcRenderer.invoke('get-item-rework-count', itemId),
   getItemsByStatuses: (statuses: string[]) => ipcRenderer.invoke('get-items-by-statuses', statuses),
+  getItemsWithReworkCount: (statuses: string[]) => ipcRenderer.invoke('get-items-with-rework-count', statuses),
 })
 
 export type API = typeof window.api

@@ -299,7 +299,7 @@ function setupIpcHandlers() {
         w.id as worker_id,
         w.name as worker_name,
         COUNT(DISTINCT wo.item_id) as total_items,
-        SUM(CASE WHEN i.status IN ('SEALED','SOLD') THEN 1 ELSE 0 END) as passed,
+        SUM(CASE WHEN i.status IN ('PENDING_SEAL','SEALED','SOLD') THEN 1 ELSE 0 END) as passed,
         SUM(wo.rework_count) as total_reworks,
         AVG(wo.total_minutes) as avg_minutes
       FROM workers w
@@ -374,6 +374,20 @@ function setupIpcHandlers() {
       `SELECT * FROM items WHERE status IN (${placeholders}) ORDER BY updated_at ASC`,
       statuses
     )
+    return mapArrayToCamel(rows)
+  })
+
+  ipcMain.handle('get-items-with-rework-count', (_e, statuses) => {
+    if (!statuses || statuses.length === 0) return []
+    const placeholders = statuses.map(() => '?').join(', ')
+    const rows = getQuery(`
+      SELECT i.*, COALESCE(MAX(wo.rework_count), 0) as rework_count
+      FROM items i
+      LEFT JOIN work_orders wo ON i.id = wo.item_id
+      WHERE i.status IN (${placeholders})
+      GROUP BY i.id
+      ORDER BY i.updated_at ASC
+    `, statuses)
     return mapArrayToCamel(rows)
   })
 }

@@ -30,6 +30,7 @@ export default function InspectionPage() {
   const [workers, setWorkers] = useState<Worker[]>([])
   const [form] = Form.useForm()
   const [showReworkModal, setShowReworkModal] = useState(false)
+  const [selectedResult, setSelectedResult] = useState<string | null>(null)
   const [taskItems, setTaskItems] = useState<{ inspecting: Item[]; rework: Item[]; sealed: Item[] }>({
     inspecting: [], rework: [], sealed: []
   })
@@ -42,6 +43,7 @@ export default function InspectionPage() {
   useEffect(() => {
     if (selectedItemId) {
       loadRelatedData(selectedItemId)
+      setSelectedResult(null)  // 切换商品时重置选择
     }
   }, [selectedItemId])
 
@@ -56,15 +58,15 @@ export default function InspectionPage() {
 
   const loadTaskItems = async () => {
     try {
-      const [inspecting, rework, sealed] = await Promise.all([
+      const [inspecting, cleaningWithRework, pendingSeal] = await Promise.all([
         window.api.getItemsByStatuses(['INSPECTING']),
-        window.api.getItemsByStatuses(['CLEANING']),
-        window.api.getItemsByStatuses(['SEALED'])
+        window.api.getItemsWithReworkCount(['CLEANING']),
+        window.api.getItemsByStatuses(['PENDING_SEAL'])
       ])
-      const reworkItems = rework.filter((item: Item) => {
-        return item.assignedTo
+      const reworkItems = cleaningWithRework.filter((item: any) => {
+        return item.reworkCount > 0
       })
-      setTaskItems({ inspecting, rework: reworkItems, sealed })
+      setTaskItems({ inspecting, rework: reworkItems, sealed: pendingSeal })
     } catch (error) {
       console.error('加载任务列表失败', error)
     }
@@ -139,7 +141,7 @@ export default function InspectionPage() {
 
       let newStatus = selectedItem.status
       if (values.result === 'SELLABLE' || values.result === 'DISCOUNTED') {
-        newStatus = 'SEALED'
+        newStatus = 'PENDING_SEAL'
       } else if (values.result === 'RETURNED') {
         newStatus = 'RETURNED'
       } else if (values.result === 'REWORK') {
@@ -191,7 +193,7 @@ export default function InspectionPage() {
 
   const latestWorkOrder = workOrders[0]
 
-  const taskListColumns = [
+  const taskListColumns = (showReworkCount = false) => [
     {
       title: '编码',
       dataIndex: 'code',
@@ -202,10 +204,15 @@ export default function InspectionPage() {
       title: '名称',
       dataIndex: 'name',
       ellipsis: true,
-      render: (text: string, record: Item) => (
+      render: (text: string, record: Item & { reworkCount?: number }) => (
         <div>
           <div style={{ fontSize: 13, fontWeight: 500 }}>{text}</div>
-          <div style={{ fontSize: 11, color: '#999' }}>{CATEGORY_LABELS[record.category as keyof typeof CATEGORY_LABELS]}</div>
+          <div style={{ fontSize: 11, color: '#999' }}>
+            {CATEGORY_LABELS[record.category as keyof typeof CATEGORY_LABELS]}
+            {showReworkCount && record.reworkCount && (
+              <Tag color="orange" style={{ marginLeft: 6, fontSize: 10 }}>返工×{record.reworkCount}</Tag>
+            )}
+          </div>
         </div>
       )
     },
@@ -218,7 +225,14 @@ export default function InspectionPage() {
     }
   ]
 
-  const renderTaskList = (title: string, items: Item[], color: string, icon: React.ReactNode, emptyText: string) => (
+  const renderTaskList = (
+    title: string, 
+    items: Item[], 
+    color: string, 
+    icon: React.ReactNode, 
+    emptyText: string,
+    showRework = false
+  ) => (
     <Card 
       title={<Space>{icon}<span style={{ fontSize: 14 }}>{title}</span><Badge count={items.length} style={{ backgroundColor: color }} /></Space>} 
       size="small" 
@@ -231,7 +245,7 @@ export default function InspectionPage() {
           dataSource={items}
           rowKey="id"
           pagination={false}
-          columns={taskListColumns}
+          columns={taskListColumns(showRework)}
           onRow={(record) => ({
             onClick: () => handleTaskItemClick(record),
             style: { cursor: 'pointer' }
@@ -272,7 +286,8 @@ export default function InspectionPage() {
               taskItems.rework,
               '#f59e0b',
               <ReloadOutlined style={{ color: '#f59e0b' }} />,
-              '暂无返工回检商品'
+              '暂无返工回检商品',
+              true
             )}
             {renderTaskList(
               '已通过待封存',
@@ -288,7 +303,7 @@ export default function InspectionPage() {
             <ItemSelector
               value={selectedItemId}
               onChange={handleItemSelect}
-              statusFilter={['INSPECTING', 'CLEANING', 'SEALED']}
+              statusFilter={['INSPECTING', 'CLEANING', 'PENDING_SEAL']}
               placeholder="搜索商品编码/名称"
             />
           </Card>
@@ -478,7 +493,10 @@ export default function InspectionPage() {
                         size="large"
                         icon={<CheckCircleOutlined />}
                         style={{ width: '100%', height: 50, fontSize: 16 }}
-                        onClick={() => form.setFieldsValue({ result: 'SELLABLE' })}
+                        onClick={() => {
+                          form.setFieldsValue({ result: 'SELLABLE' })
+                          setSelectedResult('SELLABLE')
+                        }}
                       >
                         ✅ 可售 - 正常定价
                       </Button>
@@ -486,7 +504,10 @@ export default function InspectionPage() {
                         size="large"
                         icon={<ExclamationCircleOutlined />}
                         style={{ width: '100%', height: 50, fontSize: 16, background: '#fef3c7', borderColor: '#f59e0b', color: '#92400e' }}
-                        onClick={() => form.setFieldsValue({ result: 'DISCOUNTED' })}
+                        onClick={() => {
+                          form.setFieldsValue({ result: 'DISCOUNTED' })
+                          setSelectedResult('DISCOUNTED')
+                        }}
                       >
                         ⚠️ 降价售 - 有瑕疵
                       </Button>
@@ -503,17 +524,20 @@ export default function InspectionPage() {
                         size="large"
                         icon={<CloseCircleOutlined />}
                         style={{ width: '100%', height: 50, fontSize: 16 }}
-                        onClick={() => form.setFieldsValue({ result: 'RETURNED' })}
+                        onClick={() => {
+                          form.setFieldsValue({ result: 'RETURNED' })
+                          setSelectedResult('RETURNED')
+                        }}
                       >
                         ❌ 退回 - 不可出售
                       </Button>
                     </Space>
 
-                    {form.getFieldValue('result') && (
+                    {selectedResult && (
                       <div style={{ marginTop: 20, padding: 16, background: '#f5f7fa', borderRadius: 8, textAlign: 'center' }}>
                         <Text type="secondary">已选择结论：</Text>
                         <div style={{ fontSize: 20, fontWeight: 600, marginTop: 4, color: '#166534' }}>
-                          {INSPECTION_RESULT_LABELS[form.getFieldValue('result') as keyof typeof INSPECTION_RESULT_LABELS]}
+                          {INSPECTION_RESULT_LABELS[selectedResult as keyof typeof INSPECTION_RESULT_LABELS]}
                         </div>
                         <Button
                           type="primary"
@@ -584,6 +608,7 @@ export default function InspectionPage() {
         onCancel={() => setShowReworkModal(false)}
         onOk={() => {
           form.setFieldsValue({ result: 'REWORK' })
+          setSelectedResult('REWORK')
           setShowReworkModal(false)
         }}
         okText="确认返工"

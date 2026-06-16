@@ -1,4 +1,4 @@
-export type ItemStatus = 'PENDING' | 'CLEANING' | 'INSPECTING' | 'SEALED' | 'SOLD' | 'RETURNED' | 'ANOMALY'
+export type ItemStatus = 'PENDING' | 'CLEANING' | 'INSPECTING' | 'PENDING_SEAL' | 'SEALED' | 'SOLD' | 'RETURNED' | 'ANOMALY'
 
 export type ItemCategory = 'STROLLER' | 'TOY' | 'FEEDING' | 'CLOTHING'
 
@@ -146,6 +146,7 @@ export const STATUS_LABELS: Record<ItemStatus, string> = {
   PENDING: '待处理',
   CLEANING: '清洁中',
   INSPECTING: '复检中',
+  PENDING_SEAL: '待封存',
   SEALED: '已封存',
   SOLD: '已出售',
   RETURNED: '已退回',
@@ -156,6 +157,7 @@ export const STATUS_COLORS: Record<ItemStatus, string> = {
   PENDING: 'gold',
   CLEANING: 'blue',
   INSPECTING: 'cyan',
+  PENDING_SEAL: 'green',
   SEALED: 'green',
   SOLD: 'purple',
   RETURNED: 'red',
