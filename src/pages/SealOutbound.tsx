@@ -3,8 +3,17 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Card, Button, Space, Row, Col, Typography, Select, Form, Tag, message, Descriptions, Table, Divider, QRCode } from 'antd'
 import { ArrowLeftOutlined, PrinterOutlined, QrcodeOutlined, CheckCircleOutlined } from '@ant-design/icons'
 import ItemSelector from '../components/ItemSelector'
-import { Item, WorkOrder, Inspection, Photo, Seal, HistoryCard, Worker, CATEGORY_LABELS, STATUS_LABELS, STATUS_COLORS, INSPECTION_RESULT_LABELS } from '../types'
+import { Item, WorkOrder, Inspection, Photo, Seal, HistoryCard, Worker, CATEGORY_LABELS, STATUS_LABELS, STATUS_COLORS, INSPECTION_RESULT_LABELS, CONDITION_LABELS } from '../types'
 import dayjs from 'dayjs'
+
+const RESTRICTION_LABELS: Record<string, string> = {
+  WASHABLE: '可水洗',
+  WIPE_ONLY: '仅可擦拭',
+  NO_HIGH_TEMP: '不可高温',
+  NO_BLEACH: '不可漂白',
+  NO_SUN: '不可暴晒',
+  DELICATE: '轻柔处理'
+}
 
 const { Title, Text } = Typography
 const { Option } = Select
@@ -58,44 +67,33 @@ export default function SealOutbound() {
 
   const loadRelatedData = async (itemId: string) => {
     try {
-      const [orders, insps, phs, sls] = await Promise.all([
+      const [item, orders, insps, phs, sls] = await Promise.all([
+        window.api.getItem(itemId),
         window.api.getWorkOrders(itemId),
         window.api.getInspections(itemId),
         window.api.getPhotos(itemId),
         window.api.getSeals(itemId)
       ])
-      setWorkOrders(orders.map((o: any) => ({
-        ...o,
-        partsChecklist: o.parts_checklist ? JSON.parse(o.parts_checklist) : {},
-        cleaningRestrictions: o.cleaning_restrictions ? JSON.parse(o.cleaning_restrictions) : [],
-        partsMissing: o.parts_missing ? JSON.parse(o.parts_missing) : []
-      })))
+      setSelectedItem(item)
+      form.setFieldsValue({
+        operatorId: workers.find(w => w.role === 'OPERATOR')?.id
+      })
+      setWorkOrders(orders)
       setInspections(insps)
       setPhotos(phs)
-      setSeals(sls.map((s: any) => ({
-        ...s,
-        historyCard: JSON.parse(s.history_card)
-      })))
-      if (sls.length > 0) {
-        const latestSeal = sls[sls.length - 1]
-        setCurrentSeal({
-          ...latestSeal,
-          historyCard: JSON.parse(latestSeal.history_card)
-        })
+      setSeals(sls)
+      if (sls && sls.length > 0) {
+        setCurrentSeal(sls[0])
+      } else {
+        setCurrentSeal(null)
       }
     } catch (error) {
       console.error('加载相关数据失败', error)
     }
   }
 
-  const handleItemSelect = (id: string, item?: Item) => {
+  const handleItemSelect = (id: string) => {
     setSelectedItemId(id)
-    setSelectedItem(item || null)
-    setWorkOrders([])
-    setInspections([])
-    setPhotos([])
-    setSeals([])
-    setCurrentSeal(null)
     form.resetFields()
   }
 
@@ -112,6 +110,10 @@ export default function SealOutbound() {
 
   const handleSeal = async (values: any) => {
     if (!selectedItem || !selectedItemId) return
+    if (currentSeal) {
+      message.warning('该商品已封存，无需重复生成封签')
+      return
+    }
     try {
       const now = new Date().toISOString()
       const sealCode = generateSealCode()
@@ -200,7 +202,7 @@ export default function SealOutbound() {
         updated_at: new Date().toISOString()
       })
       message.success('已标记为已出售')
-      loadItemDetail(selectedItemId)
+      loadRelatedData(selectedItemId)
     } catch (error) {
       message.error('操作失败')
       console.error(error)
@@ -300,16 +302,53 @@ export default function SealOutbound() {
                     </Descriptions.Item>
                   </Descriptions>
 
-                  {latestWorkOrder?.cleaningRestrictions?.length ? (
-                    <div style={{ marginBottom: 16 }}>
-                      <Text strong>清洁限制：</Text>
-                      <Space style={{ marginLeft: 8 }} wrap>
-                        {latestWorkOrder.cleaningRestrictions.map((r: string) => (
-                          <Tag key={r} color="blue">{r}</Tag>
-                        ))}
-                      </Space>
+                  {latestWorkOrder && (
+                    <div style={{ marginBottom: 16, padding: 12, background: '#f0fdf4', borderRadius: 6 }}>
+                      <Text strong>清洁作业记录：</Text>
+                      <div style={{ marginTop: 8 }}>
+                        <Space direction="vertical" size="small" style={{ width: '100%' }}>
+                          <div>
+                            <Text type="secondary">初检评估：</Text>
+                            <Space style={{ marginLeft: 8 }} wrap>
+                              <span className={`condition-tag ${latestWorkOrder.wearLevel || 'NONE'}`}>
+                                磨损：{CONDITION_LABELS[(latestWorkOrder.wearLevel as keyof typeof CONDITION_LABELS) || 'NONE']}
+                              </span>
+                              <span className={`condition-tag ${latestWorkOrder.moldLevel || 'NONE'}`}>
+                                霉点：{CONDITION_LABELS[(latestWorkOrder.moldLevel as keyof typeof CONDITION_LABELS) || 'NONE']}
+                              </span>
+                              <span className={`condition-tag ${latestWorkOrder.odorLevel || 'NONE'}`}>
+                                异味：{CONDITION_LABELS[(latestWorkOrder.odorLevel as keyof typeof CONDITION_LABELS) || 'NONE']}
+                              </span>
+                            </Space>
+                          </div>
+                          {(latestWorkOrder.cleaningRestrictions?.length || 0) > 0 && (
+                            <div>
+                              <Text type="secondary">清洁限制：</Text>
+                              <Space style={{ marginLeft: 8 }} wrap>
+                                {latestWorkOrder.cleaningRestrictions?.map((r: string) => (
+                                  <Tag key={r} color="blue">{RESTRICTION_LABELS[r] || r}</Tag>
+                                ))}
+                              </Space>
+                            </div>
+                          )}
+                          {(latestWorkOrder.partsMissing?.length || 0) > 0 && (
+                            <div>
+                              <Text type="secondary">缺失部件：</Text>
+                              <Tag color="red" style={{ marginLeft: 8 }}>
+                                {latestWorkOrder.partsMissing?.join('、')}
+                              </Tag>
+                            </div>
+                          )}
+                          {latestWorkOrder.notes && (
+                            <div>
+                              <Text type="secondary">作业备注：</Text>
+                              <span style={{ marginLeft: 8 }}>{latestWorkOrder.notes}</span>
+                            </div>
+                          )}
+                        </Space>
+                      </div>
                     </div>
-                  ) : null}
+                  )}
 
                   {latestInspection?.notes && (
                     <div style={{ marginBottom: 16, padding: 12, background: '#fef3c7', borderRadius: 6 }}>
@@ -457,6 +496,20 @@ export default function SealOutbound() {
                           <span className="history-card-label">清洁员：</span>
                           <span className="history-card-value">{getWorkerName(latestWorkOrder.workerId)}</span>
                         </div>
+                        {(latestWorkOrder.cleaningRestrictions?.length || 0) > 0 && (
+                          <div className="history-card-item">
+                            <span className="history-card-label">清洁限制：</span>
+                            <span className="history-card-value">
+                              {latestWorkOrder.cleaningRestrictions?.map((r: string) => RESTRICTION_LABELS[r] || r).join('、')}
+                            </span>
+                          </div>
+                        )}
+                        {(latestWorkOrder.partsMissing?.length || 0) > 0 && (
+                          <div className="history-card-item">
+                            <span className="history-card-label">缺失部件：</span>
+                            <span className="history-card-value">{latestWorkOrder.partsMissing?.join('、')}</span>
+                          </div>
+                        )}
                       </>
                     )}
 

@@ -40,10 +40,33 @@ export default function WorkOrderPage() {
 
   useEffect(() => {
     if (selectedItemId) {
-      loadItemDetail(selectedItemId)
-      loadCategoryData()
+      loadItemAndCategory(selectedItemId)
     }
   }, [selectedItemId])
+
+  const loadItemAndCategory = async (id: string) => {
+    try {
+      const item = await window.api.getItem(id)
+      setSelectedItem(item)
+      form.setFieldsValue({
+        workerId: item.assignedTo,
+      })
+      const [steps, parts] = await Promise.all([
+        window.api.getCategoryWorkflow(item.category),
+        window.api.getCategoryParts(item.category)
+      ])
+      setWorkflow(steps)
+      setCategoryParts(parts)
+      const initialChecklist: Record<string, boolean> = {}
+      parts.forEach((p: string) => { initialChecklist[p] = true })
+      setPartsChecklist(initialChecklist)
+      setCompletedSteps([])
+      setCurrentStep(0)
+    } catch (error) {
+      message.error('加载商品数据失败')
+      console.error(error)
+    }
+  }
 
   useEffect(() => {
     let interval: NodeJS.Timeout
@@ -64,43 +87,11 @@ export default function WorkOrderPage() {
     }
   }
 
-  const loadItemDetail = async (id: string) => {
-    try {
-      const item = await window.api.getItem(id)
-      setSelectedItem(item)
-      form.setFieldsValue({
-        workerId: item.assignedTo,
-      })
-    } catch (error) {
-      message.error('加载商品详情失败')
-      console.error(error)
-    }
-  }
-
-  const loadCategoryData = async () => {
-    if (!selectedItem) return
-    try {
-      const [steps, parts] = await Promise.all([
-        window.api.getCategoryWorkflow(selectedItem.category),
-        window.api.getCategoryParts(selectedItem.category)
-      ])
-      setWorkflow(steps)
-      setCategoryParts(parts)
-      const initialChecklist: Record<string, boolean> = {}
-      parts.forEach((p: string) => { initialChecklist[p] = true })
-      setPartsChecklist(initialChecklist)
-    } catch (error) {
-      console.error('加载品类数据失败', error)
-    }
-  }
-
-  const handleItemSelect = (id: string, item?: Item) => {
+  const handleItemSelect = (id: string) => {
     setSelectedItemId(id)
-    setSelectedItem(item || null)
-    setCompletedSteps([])
-    setCurrentStep(0)
     setElapsedSeconds(0)
     setTiming(false)
+    setStartTime(undefined)
   }
 
   const handleStartTimer = () => {

@@ -40,6 +40,7 @@ declare global {
       
       getCategoryWorkflow: (category: string) => Promise<any[]>
       getCategoryParts: (category: string) => Promise<any[]>
+      getNextItemCode: () => Promise<string>
     }
   }
 }

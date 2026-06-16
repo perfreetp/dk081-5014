@@ -32,6 +32,7 @@ contextBridge.exposeInMainWorld('api', {
 
   getCategoryWorkflow: (category: string) => ipcRenderer.invoke('get-category-workflow', category),
   getCategoryParts: (category: string) => ipcRenderer.invoke('get-category-parts', category),
+  getNextItemCode: () => ipcRenderer.invoke('get-next-item-code'),
 })
 
 export type API = typeof window.api

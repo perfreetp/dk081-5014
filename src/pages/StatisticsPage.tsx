@@ -209,7 +209,9 @@ export default function StatisticsPage() {
             <Col span={6}>
               <Card className="stat-card">
                 <div className="stat-value" style={{ color: '#22c55e' }}>
-                  {stats.byStatus.find(s => s.status === 'SEALED' || s.status === 'SOLD')?.count || 0}
+                  {stats.byStatus
+                    .filter(s => s.status === 'SEALED' || s.status === 'SOLD')
+                    .reduce((sum, s) => sum + (s.count || 0), 0)}
                 </div>
                 <div className="stat-label">已完成处理</div>
               </Card>

@@ -297,7 +297,7 @@ function setupIpcHandlers() {
         w.id as worker_id,
         w.name as worker_name,
         COUNT(DISTINCT wo.item_id) as total_items,
-        SUM(CASE WHEN i.status = 'SEALED' OR i.status = 'SOLD' THEN 1 ELSE 0 END) as passed,
+        SUM(CASE WHEN i.status IN ('SEALED','SOLD') THEN 1 ELSE 0 END) as passed,
         SUM(wo.rework_count) as total_reworks,
         AVG(wo.total_minutes) as avg_minutes
       FROM workers w
@@ -333,5 +333,23 @@ function setupIpcHandlers() {
   ipcMain.handle('get-category-parts', (_e, category) => {
     const row = getOne('SELECT parts FROM category_parts WHERE category = ?', [category])
     return row ? JSON.parse(row.parts) : []
+  })
+
+  ipcMain.handle('get-next-item-code', () => {
+    const row = getOne(`
+      SELECT code FROM items 
+      WHERE code LIKE 'BC-____-%' 
+      ORDER BY code DESC LIMIT 1
+    `)
+    const year = new Date().getFullYear()
+    if (!row || !row.code) {
+      return `BC-${year}-0001`
+    }
+    const match = row.code.match(/BC-\d{4}-(\d{4})/)
+    let nextNum = 1
+    if (match) {
+      nextNum = parseInt(match[1], 10) + 1
+    }
+    return `BC-${year}-${String(nextNum).padStart(4, '0')}`
   })
 }

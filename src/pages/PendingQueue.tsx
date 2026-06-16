@@ -63,7 +63,7 @@ export default function PendingQueue() {
   const handleCreate = async (values: any) => {
     try {
       const now = new Date().toISOString()
-      const code = `BC-${dayjs().format('YYYY')}-${String(items.length + 1).padStart(4, '0')}`
+      const code = await window.api.getNextItemCode()
       await window.api.createItem({
         id: crypto.randomUUID(),
         code,
@@ -78,7 +78,7 @@ export default function PendingQueue() {
         createdAt: now,
         updatedAt: now
       })
-      message.success('创建成功')
+      message.success(`创建成功：${code}`)
       setCreateModalVisible(false)
       form.resetFields()
       loadData()

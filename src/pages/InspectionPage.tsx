@@ -6,6 +6,15 @@ import ItemSelector from '../components/ItemSelector'
 import { Item, WorkOrder, Inspection, Photo, Worker, CATEGORY_LABELS, STATUS_LABELS, STATUS_COLORS, CONDITION_LABELS, INSPECTION_RESULT_LABELS } from '../types'
 import dayjs from 'dayjs'
 
+const RESTRICTION_LABELS: Record<string, string> = {
+  WASHABLE: '可水洗',
+  WIPE_ONLY: '仅可擦拭',
+  NO_HIGH_TEMP: '不可高温',
+  NO_BLEACH: '不可漂白',
+  NO_SUN: '不可暴晒',
+  DELICATE: '轻柔处理'
+}
+
 const { Title, Text } = Typography
 const { TextArea } = Input
 const { Option } = Select
@@ -57,17 +66,17 @@ export default function InspectionPage() {
 
   const loadRelatedData = async (itemId: string) => {
     try {
-      const [orders, insps, phs] = await Promise.all([
+      const [item, orders, insps, phs] = await Promise.all([
+        window.api.getItem(itemId),
         window.api.getWorkOrders(itemId),
         window.api.getInspections(itemId),
         window.api.getPhotos(itemId)
       ])
-      setWorkOrders(orders.map((o: any) => ({
-        ...o,
-        partsChecklist: o.parts_checklist ? JSON.parse(o.parts_checklist) : {},
-        cleaningRestrictions: o.cleaning_restrictions ? JSON.parse(o.cleaning_restrictions) : [],
-        partsMissing: o.parts_missing ? JSON.parse(o.parts_missing) : []
-      })))
+      setSelectedItem(item)
+      form.setFieldsValue({
+        inspectorId: workers.find(w => w.role === 'INSPECTOR')?.id
+      })
+      setWorkOrders(orders)
       setInspections(insps)
       setPhotos(phs)
     } catch (error) {
@@ -75,12 +84,8 @@ export default function InspectionPage() {
     }
   }
 
-  const handleItemSelect = (id: string, item?: Item) => {
+  const handleItemSelect = (id: string) => {
     setSelectedItemId(id)
-    setSelectedItem(item || null)
-    setWorkOrders([])
-    setInspections([])
-    setPhotos([])
     form.resetFields()
   }
 
@@ -259,7 +264,7 @@ export default function InspectionPage() {
                     <Space style={{ marginLeft: 8 }} wrap>
                       {latestWorkOrder.cleaningRestrictions?.length ? (
                         latestWorkOrder.cleaningRestrictions.map((r: string) => (
-                          <Tag key={r} color="blue">{r}</Tag>
+                          <Tag key={r} color="blue">{RESTRICTION_LABELS[r] || r}</Tag>
                         ))
                       ) : <Text type="secondary">无特殊限制</Text>}
                     </Space>
